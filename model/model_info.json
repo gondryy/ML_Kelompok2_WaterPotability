@@ -1,0 +1,77 @@
+{
+  "best_model_name": "SVM (RBF)",
+  "default_threshold": 0.5,
+  "recommended_threshold": 0.6,
+  "selection_criterion": "5-Fold Stratified CV ROC-AUC + OOF FP Reduction >= 40%",
+  "final_test_metrics_at_recommended_th": {
+    "Threshold": 0.6,
+    "ROC_AUC": 0.6488,
+    "Accuracy": 0.6631,
+    "Precision": 0.6966,
+    "Recall": 0.2422,
+    "Specificity": 0.9325,
+    "F1_Score": 0.3594,
+    "TP": 62,
+    "TN": 373,
+    "FP": 27,
+    "FN": 194
+  },
+  "feature_cols": [
+    "ph",
+    "Hardness",
+    "Solids",
+    "Chloramines",
+    "Sulfate",
+    "Conductivity",
+    "Organic_carbon",
+    "Trihalomethanes",
+    "Turbidity"
+  ],
+  "feature_stats": {
+    "ph": {
+      "min": 0.0,
+      "max": 13.999999999999998,
+      "median": 7.036752103833548
+    },
+    "Hardness": {
+      "min": 47.432,
+      "max": 323.124,
+      "median": 196.96762686363073
+    },
+    "Solids": {
+      "min": 320.942611274359,
+      "max": 61227.19600771213,
+      "median": 20927.833606520187
+    },
+    "Chloramines": {
+      "min": 0.3520000000000003,
+      "max": 13.127000000000002,
+      "median": 7.130298973883081
+    },
+    "Sulfate": {
+      "min": 129.00000000000003,
+      "max": 481.03064230599716,
+      "median": 333.073545745888
+    },
+    "Conductivity": {
+      "min": 181.483753985146,
+      "max": 753.3426195583046,
+      "median": 421.88496828005435
+    },
+    "Organic_carbon": {
+      "min": 2.1999999999999886,
+      "max": 28.30000000000001,
+      "median": 14.218337937208588
+    },
+    "Trihalomethanes": {
+      "min": 0.7379999999999995,
+      "max": 124.0,
+      "median": 66.62248509808484
+    },
+    "Turbidity": {
+      "min": 1.45,
+      "max": 6.739,
+      "median": 3.9550275629930396
+    }
+  }
+}
