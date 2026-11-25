@@ -44,6 +44,7 @@ eval_tables = get_eval_tables()
 
 FEATURES = info["feature_cols"]
 STATS = info["feature_stats"]
+BEST_MODEL_NAME = info.get("best_model_name", "SVM (RBF)")
 DEFAULT_THRESHOLD = float(info["recommended_threshold"])
 CLASS_NAMES = ["Not Potable", "Potable"]
 COLOR_MAP = {"Potable": "#2ecc71", "Not Potable": "#e74c3c"}
@@ -94,6 +95,7 @@ def compute_binary_shap(trained_pipeline, X_row: pd.DataFrame, target_class_idx:
 # Sidebar Navigation
 # ============================================
 st.sidebar.title("💧 Water Potability")
+st.sidebar.caption(f"Active Model: **{BEST_MODEL_NAME}**")
 page = st.sidebar.radio(
     "Navigation",
     ["Home", "Prediction", "Model Explanation", "Comparison Mode", "Live Monitoring"],
@@ -107,7 +109,8 @@ if page == "Home":
         st.title("💧 Water Potability Prediction Dashboard")
         st.info(
             f"""
-            Evaluate whether water is safe for consumption (**Potable** vs. **Not Potable**) using 9 physicochemical parameters (decision threshold: **{DEFAULT_THRESHOLD:.2f}**):
+            Evaluate whether water is safe for consumption (**Potable** vs. **Not Potable**) using 9 physicochemical parameters
+            with active model **{BEST_MODEL_NAME}** (decision threshold: **{DEFAULT_THRESHOLD:.2f}**):
 
             - 🔹 **Single-Sample Prediction** with tuned threshold & range validation
             - 🔹 **SHAP Explainability** showing how each parameter pushes the prediction
@@ -117,8 +120,8 @@ if page == "Home":
         )
 
         if eval_tables.get("comparison") is not None:
-            st.subheader("Model Evaluation Summary")
-            st.dataframe(eval_tables["comparison"], width="stretch")
+            st.subheader("Model Evaluation Summary (SVM, Random Forest, CatBoost, KNN, Logistic Regression)")
+            st.dataframe(eval_tables["comparison"], use_container_width=True)
 
 # ============================================
 # 2. Prediction
@@ -126,7 +129,7 @@ if page == "Home":
 elif page == "Prediction":
     with st.container(border=True):
         st.title("Water Potability Prediction")
-        st.caption("Default values are initialized to training set medians.")
+        st.caption(f"Model: **{BEST_MODEL_NAME}** • Default values are initialized to training set medians.")
 
         def default_val(col):
             return float(STATS[col].get("median", (STATS[col]["min"] + STATS[col]["max"]) / 2))
@@ -168,7 +171,7 @@ elif page == "Prediction":
                 """
             )
 
-        if st.button("Predict Potability", type="primary", width="stretch"):
+        if st.button("Predict Potability", type="primary", use_container_width=True):
             raw_input = {
                 "ph": ph,
                 "Hardness": hardness,
@@ -207,7 +210,7 @@ elif page == "Prediction":
             ).sort_values(by="Probability (%)", ascending=False)
 
             st.subheader("Prediction Probabilities")
-            st.dataframe(proba_df.style.format({"Probability (%)": "{:.2f}"}), width="stretch")
+            st.dataframe(proba_df.style.format({"Probability (%)": "{:.2f}"}), use_container_width=True)
 
             colors = [COLOR_MAP[c] for c in proba_df["Class"]]
             fig, ax = plt.subplots(figsize=(6, 2.5))
@@ -234,11 +237,12 @@ elif page == "Prediction":
 elif page == "Model Explanation":
     with st.container(border=True):
         st.title("📖 Model Explanation (SHAP)")
+        st.caption(f"Explaining active pipeline: **{BEST_MODEL_NAME}**")
 
         if not SHAP_AVAILABLE:
             st.warning("`shap` is not installed in the current environment. Showing saved permutation importance instead.")
             if eval_tables.get("importance") is not None:
-                st.dataframe(eval_tables["importance"], width="stretch")
+                st.dataframe(eval_tables["importance"], use_container_width=True)
         else:
             if "last_input" in st.session_state:
                 X_row = st.session_state["last_input"]
@@ -276,7 +280,7 @@ elif page == "Model Explanation":
                 st.warning(f"Local SHAP plot unavailable for this estimator ({e}).")
                 if eval_tables.get("importance") is not None:
                     st.subheader("Global Permutation Importance")
-                    st.dataframe(eval_tables["importance"], width="stretch")
+                    st.dataframe(eval_tables["importance"], use_container_width=True)
 
 # ============================================
 # 4. Comparison Mode (Batch CSV)
@@ -293,7 +297,7 @@ elif page == "Comparison Mode":
                 result_df = predict_batch(compare_df, pipeline, info, threshold=DEFAULT_THRESHOLD)
 
                 st.subheader(f"Batch Predictions ({len(result_df)} samples)")
-                st.dataframe(result_df, width="stretch")
+                st.dataframe(result_df, use_container_width=True)
 
                 st.download_button(
                     label="⬇️ Download Predictions CSV",
@@ -339,41 +343,4 @@ elif page == "Comparison Mode":
 elif page == "Live Monitoring":
     with st.container(border=True):
         st.title("📡 Live Sensor Monitoring (Simulated)")
-        streaming = st.toggle("Enable live stream (2s interval)", value=True)
-
-        if "live_data" not in st.session_state:
-            st.session_state["live_data"] = pd.DataFrame(columns=FEATURES + ["Prediction"])
-
-        @st.fragment(run_every=2 if streaming else None)
-        def render_live_stream():
-            if streaming:
-                sample = {
-                    col: float(np.random.uniform(STATS[col]["min"], STATS[col]["max"]))
-                    for col in FEATURES
-                }
-                res = predict_single(sample, pipeline, info, threshold=DEFAULT_THRESHOLD)
-                sample["Prediction"] = CLASS_NAMES[res["potability"]]
-
-                st.session_state["live_data"] = pd.concat(
-                    [st.session_state["live_data"], pd.DataFrame([sample])],
-                    ignore_index=True,
-                ).tail(20)
-
-            live_df = st.session_state["live_data"]
-            if not live_df.empty:
-                latest = live_df.iloc[-1]
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Status", latest["Prediction"])
-                m2.metric("pH", f"{latest['ph']:.2f}")
-                m3.metric("Solids (ppm)", f"{latest['Solids']:.0f}")
-                m4.metric("Turbidity (NTU)", f"{latest['Turbidity']:.2f}")
-
-                st.subheader("Normalized Sensor Trends (Last 20 Readings)")
-                numeric_df = live_df[FEATURES]
-                norm_df = (numeric_df - numeric_df.min()) / (numeric_df.max() - numeric_df.min() + 1e-9)
-                st.line_chart(norm_df)
-
-                st.subheader("Recent Classification Counts")
-                st.bar_chart(live_df["Prediction"].value_counts())
-
-        render_live_stream()
+        streaming = st.toggle

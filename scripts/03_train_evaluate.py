@@ -8,9 +8,10 @@ import os
 import joblib
 import numpy as np
 import pandas as pd
+from catboost import CatBoostClassifier
 from sklearn.base import clone
 from sklearn.calibration import CalibratedClassifierCV
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -44,14 +45,21 @@ with open(os.path.join(OUT_DIR, "feature_cols.json")) as f:
 X_train, y_train = train_df[feature_cols], train_df[TARGET_COL]
 X_test, y_test = test_df[feature_cols], test_df[TARGET_COL]
 
-# 2. Definisi 5 Algoritma Klasifikasi
+# 2. Definisi 5 Algoritma Klasifikasi (Gradient Boosting diganti CatBoost)
 models = {
     "SVM (RBF)": CalibratedClassifierCV(
         SVC(C=1.0, kernel="rbf", random_state=RANDOM_STATE),
         cv=5, method="sigmoid", ensemble=False
     ),
     "Random Forest": RandomForestClassifier(n_estimators=100, max_depth=10, random_state=RANDOM_STATE),
-    "Gradient Boosting": GradientBoostingClassifier(n_estimators=100, max_depth=3, random_state=RANDOM_STATE),
+    "CatBoost": CatBoostClassifier(
+        iterations=300,
+        depth=5,
+        learning_rate=0.05,
+        auto_class_weights="Balanced",
+        verbose=0,
+        random_seed=RANDOM_STATE,
+    ),
     "KNN": KNeighborsClassifier(n_neighbors=5),
     "Logistic Regression": LogisticRegression(random_state=RANDOM_STATE),
 }
