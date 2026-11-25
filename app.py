@@ -343,4 +343,41 @@ elif page == "Comparison Mode":
 elif page == "Live Monitoring":
     with st.container(border=True):
         st.title("📡 Live Sensor Monitoring (Simulated)")
-        streaming = st.toggle
+        streaming = st.toggle("Enable live stream (2s interval)", value=True)
+
+        if "live_data" not in st.session_state:
+            st.session_state["live_data"] = pd.DataFrame(columns=FEATURES + ["Prediction"])
+
+        @st.fragment(run_every=2 if streaming else None)
+        def render_live_stream():
+            if streaming:
+                sample = {
+                    col: float(np.random.uniform(STATS[col]["min"], STATS[col]["max"]))
+                    for col in FEATURES
+                }
+                res = predict_single(sample, pipeline, info, threshold=DEFAULT_THRESHOLD)
+                sample["Prediction"] = CLASS_NAMES[res["potability"]]
+
+                st.session_state["live_data"] = pd.concat(
+                    [st.session_state["live_data"], pd.DataFrame([sample])],
+                    ignore_index=True,
+                ).tail(20)
+
+            live_df = st.session_state["live_data"]
+            if not live_df.empty:
+                latest = live_df.iloc[-1]
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Status", latest["Prediction"])
+                m2.metric("pH", f"{latest['ph']:.2f}")
+                m3.metric("Solids (ppm)", f"{latest['Solids']:.0f}")
+                m4.metric("Turbidity (NTU)", f"{latest['Turbidity']:.2f}")
+
+                st.subheader("Normalized Sensor Trends (Last 20 Readings)")
+                numeric_df = live_df[FEATURES]
+                norm_df = (numeric_df - numeric_df.min()) / (numeric_df.max() - numeric_df.min() + 1e-9)
+                st.line_chart(norm_df)
+
+                st.subheader("Recent Classification Counts")
+                st.bar_chart(live_df["Prediction"].value_counts())
+
+        render_live_stream()
