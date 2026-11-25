@@ -51,32 +51,37 @@ COLOR_MAP = {"Potable": "#2ecc71", "Not Potable": "#e74c3c"}
 # ============================================
 # SHAP Helper (Handles Pipelines & Estimator Types)
 # ============================================
+@st.cache_data
+def get_shap_background(n_samples: int = 40) -> pd.DataFrame:
+    for path in ["output/train.csv", "data/water_potability.csv"]:
+        try:
+            df_bg = pd.read_csv(path)[FEATURES].dropna()
+            if len(df_bg) > 0:
+                return df_bg.sample(min(n_samples, len(df_bg)), random_state=42)
+        except FileNotFoundError:
+            continue
+    rng = np.random.default_rng(42)
+    return pd.DataFrame({
+        col: rng.uniform(STATS[col]["min"], STATS[col]["max"], size=n_samples)
+        for col in FEATURES
+    })
+
+@st.cache_resource
+def get_shap_explainer(_trained_pipeline, background_df: pd.DataFrame):
+    def predict_fn(X):
+        if not isinstance(X, pd.DataFrame):
+            X = pd.DataFrame(X, columns=FEATURES)
+        return _trained_pipeline.predict_proba(X)
+
+    return shap.Explainer(predict_fn, background_df)
+
 def compute_binary_shap(trained_pipeline, X_row: pd.DataFrame, target_class_idx: int):
-    if hasattr(trained_pipeline, "named_steps"):
-        estimator = trained_pipeline[-1]
-        X_transformed = trained_pipeline[:-1].transform(X_row)
-    else:
-        estimator = trained_pipeline
-        X_transformed = X_row.values
+    background_df = get_shap_background()
+    explainer = get_shap_explainer(trained_pipeline, background_df)
+    shap_values = explainer(X_row)
 
-    try:
-        explainer = shap.TreeExplainer(estimator)
-        shap_values = explainer(X_transformed)
-    except Exception:
-        explainer = shap.Explainer(estimator, X_transformed)
-        shap_values = explainer(X_transformed)
-
-    if shap_values.values.ndim == 3:
-        vals = shap_values.values[0, :, target_class_idx]
-        base = shap_values.base_values[0, target_class_idx]
-    else:
-        sign = 1 if target_class_idx == 1 else -1
-        vals = sign * shap_values.values[0]
-        base = (
-            shap_values.base_values[0]
-            if target_class_idx == 1
-            else -shap_values.base_values[0]
-        )
+    vals = shap_values.values[0, :, target_class_idx]
+    base = shap_values.base_values[0, target_class_idx]
 
     return shap.Explanation(
         values=vals,
