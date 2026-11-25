@@ -51,6 +51,17 @@ Dataset `water_potability.csv` berisi indikator kualitas fisikokimia air dari be
 | `ph` | 7.08 | 1.59 | 7.04 | 0.00 | 14.00 | `-0.0036` |
 | `Turbidity` | 3.97 | 0.78 | 3.96 | 1.45 | 6.74 | `+0.0016` |
 
+### 1.3 Pemeriksaan Duplikat, Outlier & Interpretasi Visualisasi EDA
+
+* **Data Duplikat**: Pemeriksaan `df.duplicated().sum()` menghasilkan **`0` baris duplikat** dari 3.276 sampel, sehingga seluruh baris merupakan observasi unik.
+* **Analisis Outlier (Metode IQR $1.5\times$)**: Proporsi nilai ekstrem relatif kecil di seluruh fitur—tertinggi pada `Hardness` (**83 sampel / 2.53%**), `Chloramines` (**61 sampel / 1.86%**), `Solids` (**47 sampel / 1.43%**), `ph` (**46 sampel / 1.65%**), dan `Sulfate` (**41 sampel / 1.64%**). Seluruh nilai ekstrem ini **dipertahankan** karena merepresentasikan kondisi pencemaran air ekstrem di dunia nyata (misalnya air sangat asam/basa atau kadar mineral tinggi) yang krusial untuk dideteksi model, serta dampaknya sudah diredam oleh *Median Imputation* dan *Standard Scaling*.
+* **Interpretasi 5 Visualisasi Utama (`output/eda_01` – `eda_05`)**:
+  1. **Grafik Distribusi Kelas (`eda_01_class_balance.png`)**: Menunjukkan ketidakseimbangan kelas moderat (**60.99%** kelas `0` vs **39.01%** kelas `1`). Hal ini mendasari penggunaan *Stratified Split*, evaluasi berbasis **ROC-AUC** (bukan *Accuracy* semata), serta *Threshold Tuning*.
+  2. **Grafik Missing Values (`eda_02_missing_values.png`)**: Nilai hilang hanya terkonsentrasi pada 3 parameter (`Sulfate` 23.84%, `ph` 14.99%, `Trihalomethanes` 4.95%). Menghapus baris kosong akan membuang **38.6%** dataset (tersisa 2.011 baris), sehingga imputasi median di dalam *fold* pelatihan menjadi solusi terbaik.
+  3. **Heatmap Korelasi (`eda_03_correlation_heatmap.png`)**: Korelasi linear antarfitur maupun terhadap `Potability` sangat lemah ($|r| \le 0.17$ antarfitur dan $|r| \le 0.034$ terhadap target), membuktikan tidak ada multikolinearitas berat dan relasi menuju kelayakan air bersifat non-linear.
+  4. **Boxplot 9 Parameter (`eda_04_feature_boxplots.png`)**: Median antara kelas `0` dan `1` tampak hampir berimpit secara univariat pada tiap fitur, yang menjelaskan mengapa pemisahan kelas membutuhkan kombinasi interaksi multi-parameter non-linear seperti kernel RBF pada SVM.
+  5. **Histogram & KDE Top-3 Fitur (`eda_05_top_features_hist.png`)**: Pada parameter `ph`, distribusi kelas `1` (Layak) lebih terkonsentrasi di rentang netral (`6.5–8.5`), sedangkan kelas `0` (Tidak Layak) memiliki ekor (*tail*) lebih lebar ke arah ekstrem asam maupun basa.
+
 ---
 
 ## 2. Permasalahan Pipeline Lama & Solusi Anti-Leakage
@@ -501,6 +512,25 @@ Aplikasi web dibangun menggunakan **Streamlit** yang memuat artefak `model/model
 ### Q5: Mengapa nilai *Permutation Importance* untuk `Turbidity` atau `Trihalomethanes` bernilai sedikit negatif (`-0.0160` dan `-0.0085`)?
 
 **Jawab**: *Permutation Importance* mengukur penurunan skor ROC-AUC ketika nilai suatu fitur diacak secara acak pada data Test. Nilai mendekati nol atau sedikit negatif menandakan fitur tersebut tidak memberikan kontribusi sinyal prediktif tambahan pada batas keputusan SVM RBF (pengacakannya secara kebetulan mengurangi *noise* minor pada sampel uji), sedangkan lima parameter kimia utama (`Sulfate`, `ph`, `Hardness`, `Solids`, `Chloramines`) menjadi penentu dominan kelayakan air.
+
+---
+
+## 8. Keterbatasan & Pengembangan Selanjutnya (Slide N)
+
+### 8.1 Keterbatasan Saat Ini
+1. **Keterbatasan Dataset**:
+   * Dataset hanya mencakup **9 parameter fisikokimia** dan belum menyertakan indikator **mikrobiologis** (seperti bakteri *E. coli* atau total koliform) maupun **logam berat** (timbal, arsenik, merkuri) yang sangat menentukan kelayakan air minum secara medis.
+   * Tingginya persentase data hilang pada `Sulfate` (23.84%) dan `ph` (14.99%) membatasi informasi asli yang tersedia pada sampel tersebut.
+2. **Keterbatasan Model**:
+   * Nilai **ROC-AUC sebesar `0.6487` pada data Test** (`0.7019` pada 5-Fold CV) menunjukkan bahwa fitur fisikokimia saja masih memiliki tumpang tindih (*overlap*) antar kelas. Oleh karena itu, aplikasi ini diposisikan sebagai **alat skrining awal (*early screening*)**, bukan pengganti uji laboratorium tersertifikasi.
+   * Kenaikan ambang batas ke `0.60` berhasil menurunkan *False Positive* sebesar **41.3%** (menjadi 27 kasus), namun menimbulkan *trade-off* berupa penurunan *Recall* kelas layak menjadi `25.00%` (lebih banyak air layak yang diklasifikasikan konservatif sebagai tidak layak).
+3. **Keterbatasan Aplikasi**:
+   * Fitur *Live Monitoring* pada dashboard Streamlit saat ini masih menggunakan generator data acak terdistribusi seragam (*simulated sensor stream*) dan belum terhubung langsung ke perangkat keras sensor fisik.
+
+### 8.2 Rencana Pengembangan Selanjutnya
+1. **Penambahan Fitur & Rekayasa Fitur Domain (*Domain Feature Engineering*)**: Menambahkan rasio interaksi kimia (seperti rasio `Sulfate/Hardness` atau indikator deviasi `|pH - 7.0|` dari titik netral WHO) serta mengintegrasikan parameter sensor mikrobiologi/logam berat pada pengumpulan data berikutnya.
+2. **Eksplorasi Imputasi Multivariat & Ensemble**: Menguji *Iterative Imputer (MICE)* atau *KNN Imputer* di dalam pipeline validasi silang untuk membandingkan akurasi pengisian nilai hilang `Sulfate` dan `pH` dibanding imputasi median univariat.
+3. **Integrasi Perangkat Keras IoT Nyata**: Menghubungkan endpoint inferensi model dengan mikrokontroler **ESP32** dan sensor fisik (sensor pH, TDS/Conductivity, dan Turbidity) via protokol MQTT/HTTP REST API agar halaman *Live Monitoring* memantau kualitas sumber air secara *real-time*.
 
 ```
 
