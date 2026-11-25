@@ -291,27 +291,45 @@ elif page == "Comparison Mode":
             compare_df = pd.read_csv(uploaded_file)
             try:
                 result_df = predict_batch(compare_df, pipeline, info, threshold=DEFAULT_THRESHOLD)
-                st.subheader("Batch Predictions")
+
+                st.subheader(f"Batch Predictions ({len(result_df)} samples)")
                 st.dataframe(result_df, width="stretch")
 
-                st.subheader("Potable Probability (First 5 Samples)")
-                for i in range(min(5, len(result_df))):
-                    p_pot = result_df["Probabilitas_Layak"].iloc[i] * 100
-                    p_non = 100.0 - p_pot
-                    fig, ax = plt.subplots(figsize=(6, 2.2))
-                    bars = ax.barh(
-                        ["Potable", "Not Potable"],
-                        [p_pot, p_non],
-                        color=[COLOR_MAP["Potable"], COLOR_MAP["Not Potable"]],
-                    )
-                    ax.set_xlim(0, 112)
-                    ax.set_xlabel("Probability (%)")
-                    ax.set_title(f"Sample {i + 1} — {result_df['Status_Air'].iloc[i]}")
-                    for bar in bars:
-                        w = bar.get_width()
-                        ax.text(w + 1.5, bar.get_y() + bar.get_height() / 2, f"{w:.2f}%", va="center")
-                    st.pyplot(fig)
-                    plt.close(fig)
+                st.download_button(
+                    label="⬇️ Download Predictions CSV",
+                    data=result_df.to_csv(index=False).encode("utf-8"),
+                    file_name="water_potability_predictions.csv",
+                    mime="text/csv",
+                )
+
+                st.subheader("Overall Batch Summary")
+                st.bar_chart(result_df["Status_Air"].value_counts())
+
+                st.subheader("Inspect Individual Sample")
+                sample_idx = st.number_input(
+                    "Select row index to inspect",
+                    min_value=0,
+                    max_value=len(result_df) - 1,
+                    value=0,
+                    step=1,
+                )
+                p_pot = result_df["Probabilitas_Layak"].iloc[sample_idx] * 100
+                p_non = 100.0 - p_pot
+
+                fig, ax = plt.subplots(figsize=(6, 2.2))
+                bars = ax.barh(
+                    ["Potable", "Not Potable"],
+                    [p_pot, p_non],
+                    color=[COLOR_MAP["Potable"], COLOR_MAP["Not Potable"]],
+                )
+                ax.set_xlim(0, 112)
+                ax.set_xlabel("Probability (%)")
+                ax.set_title(f"Row {sample_idx} — {result_df['Status_Air'].iloc[sample_idx]}")
+                for bar in bars:
+                    w = bar.get_width()
+                    ax.text(w + 1.5, bar.get_y() + bar.get_height() / 2, f"{w:.2f}%", va="center")
+                st.pyplot(fig)
+                plt.close(fig)
             except ValueError as err:
                 st.error(str(err))
 
