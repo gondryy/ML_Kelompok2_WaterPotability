@@ -1,0 +1,26 @@
+/* Overall background and typography */
+[data-testid="stAppViewContainer"] {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Main headings */
+.stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+    color: #2c3e50;
+}
+
+/* Style bordered containers as elevated cards */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    background-color: #ffffff;
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+}
+
+/* Mobile responsiveness */
+@media only screen and (max-width: 600px) {
+    [data-testid="stSidebar"] {
+        min-width: 180px !important;
+        max-width: 180px !important;
+    }
+}
